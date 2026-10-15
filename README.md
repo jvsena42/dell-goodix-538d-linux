@@ -66,11 +66,15 @@ Never pipe a script from the internet into a shell, this one included.
 | `uninstall.sh` | you; `sudo` | removes the drop-in, `/opt/dell-goodix-538d` and the sensor calibration file |
 
 The scripts refuse to let root run or copy anything from `work/` if another
-user could have changed it. If you see `writable by group or others`, run the
-`chmod go-w` command the error suggests. (Folders writable only by your own
-private group, which is Ubuntu's default for home folders, are fine. The check
-uses `getent`, so on machines with network accounts that are not enumerated,
-such as some LDAP setups, run `chmod go-w` on your clone to be safe.)
+user could have changed it, and `fetch.sh`/`build.sh` refuse to write into
+such a folder in the first place. Folders writable only by your own private
+group, Ubuntu's default for home folders, are fine. Folders with extended ACLs
+(`ls -l` shows a `+`) are always refused. If you see `writable by group or
+others` or `has an ACL`, fixing the permissions is not enough: someone may
+already have replaced files. Fix the permissions, delete `work/`, and run
+`fetch.sh` and `build.sh` again. The check uses `getent`, so on machines with
+network accounts that are not enumerated, such as some LDAP setups, run
+`chmod go-w` on your clone before building.
 
 If the probe is killed hard (for example `kill -9`), fprintd stays blocked
 until the next reboot. Unblock it with `sudo systemctl unmask --runtime fprintd`.

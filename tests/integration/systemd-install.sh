@@ -105,7 +105,10 @@ case $(fprintd_lib) in
     "$prefix"/lib/*) ;;
     *) fail "D-Bus-activated fprintd is not using $prefix/lib: $(fprintd_lib)" ;;
 esac
-timeout 30 fprintd-list root >/dev/null 2>&1 || fail "fprintd does not answer"
+# fprintd answers on D-Bus (whether or not this machine has a sensor).
+timeout 10 gdbus call --system --dest net.reactivated.Fprint \
+    --object-path /net/reactivated/Fprint/Manager \
+    --method net.reactivated.Fprint.Manager.GetDevices >/dev/null || fail "fprintd does not answer"
 ok "install + verify; D-Bus-activated fprintd uses $prefix/lib"
 
 # 4. Installing again is fine; a failed upgrade restores the working install.

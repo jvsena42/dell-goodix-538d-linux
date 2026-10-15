@@ -26,9 +26,12 @@ fi
 
 load_pin "$DGL_PIN_FILE"
 src=$DGL_WORK_DIR/src
+[ -d "$src/.git" ] || die "$src is not a git checkout; run scripts/fetch.sh"
+# Before git, meson or ninja read anything: they run commands from files in
+# these trees.
+check_private_tree "$src"
+[ ! -e "$build" ] || check_private_tree "$build"
 verify_checkout "$src" "$FORK_SHA"
-# The source and build trees must be ours alone, before and after building.
-check_private_path "$src"
 
 umask 022
 # Python helpers run during the build must not leave __pycache__ in the

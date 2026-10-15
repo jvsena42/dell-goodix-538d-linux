@@ -16,18 +16,20 @@ check_private_path "$DGL_WORK_DIR"
 src=$DGL_WORK_DIR/src
 
 if [ -d "$src/.git" ]; then
-    url=$("$GIT" -C "$src" config --get remote.origin.url)
+    # Before any git command: git runs programs configured inside the tree.
+    check_private_tree "$src"
+    url=$(git_safe -C "$src" config --get remote.origin.url)
     [ "$url" = "$FORK_URL" ] || die "$src points at $url, not $FORK_URL; delete it and re-run"
-    if [ "$("$GIT" -C "$src" cat-file -t "$FORK_SHA" 2>/dev/null)" != commit ]; then
+    if [ "$(git_safe -C "$src" cat-file -t "$FORK_SHA" 2>/dev/null)" != commit ]; then
         info "Fetching $FORK_URL"
-        "$GIT" -C "$src" fetch --quiet origin
+        git_safe -C "$src" fetch --quiet origin
     fi
 else
     info "Cloning $FORK_URL"
-    "$GIT" clone --quiet --no-checkout "$FORK_URL" "$src"
+    git_safe clone --quiet --no-checkout "$FORK_URL" "$src"
 fi
 
-"$GIT" -C "$src" -c advice.detachedHead=false checkout --quiet --detach "$FORK_SHA"
+git_safe -C "$src" -c advice.detachedHead=false checkout --quiet --detach "$FORK_SHA"
 verify_checkout "$src" "$FORK_SHA"
 # The security review assumes nothing else is pulled into the build.
 [ ! -e "$src/.gitmodules" ] && [ ! -e "$src/subprojects" ] ||

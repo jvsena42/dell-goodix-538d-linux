@@ -99,11 +99,11 @@ load_pin() {
 verify_checkout() {
     local src=$1 sha=$2 head
     [ -d "$src/.git" ] || die "$src is not a git checkout; run scripts/fetch.sh"
-    [ "$("$GIT" -C "$src" cat-file -t "$sha" 2>/dev/null)" = commit ] ||
+    [ "$(git_safe -C "$src" cat-file -t "$sha" 2>/dev/null)" = commit ] ||
         die "pinned commit $sha is not in $src"
-    head=$("$GIT" -C "$src" rev-parse HEAD)
+    head=$(git_safe -C "$src" rev-parse HEAD)
     [ "$head" = "$sha" ] || die "pin mismatch: $src is at $head, expected $sha"
-    [ -z "$("$GIT" -C "$src" status --porcelain --untracked-files=all)" ] ||
+    [ -z "$(git_safe -C "$src" status --porcelain --untracked-files=all)" ] ||
         die "$src has local changes; delete it and run scripts/fetch.sh again"
 }
 
@@ -192,6 +192,29 @@ check_private_file() {
     only_owner_can_write "$mode" "$owner" "$(stat -c %g "$file")" ||
         die "$file is writable by group or others (mode $mode); $(untrusted_tree_hint)"
     check_private_path "$(dirname "$file")"
+}
+
+# check_private_path for a whole tree: $1, every directory above it, and
+# everything inside it must be owned by us (or root), not group- or
+# world-writable, and without ACLs. Run it before git, meson or ninja touch a
+# tree: they execute commands from files in it (.git/config, hooks,
+# build.ninja). The trees are created with umask 022, so the inside gets no
+# private-group exception.
+check_private_tree() {
+    local dir=$1 me bad
+    me=$(current_uid)
+    check_private_path "$dir"
+    bad=$(find "$dir" ! -type l \( \( ! -uid "$me" ! -uid 0 \) -o -perm /022 \) -print -quit)
+    [ -z "$bad" ] || die "$bad is writable by group or others or owned by another user; $(untrusted_tree_hint)"
+    # shellcheck disable=SC2012 # ls is the only always-installed tool that shows the ACL marker
+    bad=$(ls -lAR -- "$dir" | awk 'substr($1, 11, 1) == "+" { print $NF; exit }')
+    [ -z "$bad" ] || die "$bad under $dir has an ACL; $(untrusted_tree_hint)"
+}
+
+# git with repository-configured programs turned off (hooks, fsmonitor), as
+# defense in depth on top of check_private_tree.
+git_safe() {
+    "$GIT" -c core.hooksPath=/dev/null -c core.fsmonitor=false "$@"
 }
 
 sensor_present() {

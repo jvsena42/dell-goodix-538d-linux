@@ -77,3 +77,34 @@ test_build_refuses_a_source_tree_with_an_acl() {
     assert_fails_with "has an ACL" run_script build.sh
     assert_no_file "$FAKE/meson.log"
 }
+
+# The attack from review: core.fsmonitor planted through a writable .git/config.
+test_build_checks_the_source_tree_before_running_git() {
+    pinned_checkout
+    printf '#!/bin/sh\ntouch %s/pwned\n' "$TMP" >"$TMP/evil"
+    chmod +x "$TMP/evil"
+    git -C "$DGL_WORK_DIR/src" config core.fsmonitor "$TMP/evil"
+    chmod 666 "$DGL_WORK_DIR/src/.git/config"
+    assert_fails_with "writable by group or others" run_script build.sh
+    assert_no_file "$TMP/pwned"
+    assert_no_file "$FAKE/meson.log"
+}
+
+test_build_never_runs_fsmonitor_even_in_a_private_tree() {
+    pinned_checkout
+    printf '#!/bin/sh\ntouch %s/pwned\n' "$TMP" >"$TMP/evil"
+    chmod +x "$TMP/evil"
+    git -C "$DGL_WORK_DIR/src" config core.fsmonitor "$TMP/evil"
+    rm -f "$TMP/pwned"
+    run_script build.sh
+    assert_no_file "$TMP/pwned"
+}
+
+test_build_checks_an_existing_build_tree_before_meson() {
+    pinned_checkout
+    mkdir -p "$DGL_WORK_DIR/build"
+    echo "rule evil" >"$DGL_WORK_DIR/build/build.ninja"
+    chmod 666 "$DGL_WORK_DIR/build/build.ninja"
+    assert_fails_with "build.ninja is writable by group or others" run_script build.sh
+    assert_no_file "$FAKE/meson.log"
+}

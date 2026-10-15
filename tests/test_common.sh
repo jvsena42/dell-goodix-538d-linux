@@ -212,3 +212,52 @@ test_untrusted_tree_errors_say_to_rebuild_not_just_chmod() {
     assert_fails_with "delete $DGL_WORK_DIR and run scripts/fetch.sh and scripts/build.sh again" \
         check_private_path "$DGL_WORK_DIR/build"
 }
+
+test_check_private_tree_accepts_a_clean_tree() {
+    lib
+    mkdir -p "$DGL_WORK_DIR/src/a/b"
+    echo x >"$DGL_WORK_DIR/src/a/b/file"
+    ln -s file "$DGL_WORK_DIR/src/a/b/link"
+    check_private_tree "$DGL_WORK_DIR/src"
+}
+
+test_check_private_tree_rejects_a_writable_file_deep_inside() {
+    lib
+    mkdir -p "$DGL_WORK_DIR/src/.git"
+    echo "[core]" >"$DGL_WORK_DIR/src/.git/config"
+    chmod 666 "$DGL_WORK_DIR/src/.git/config"
+    assert_fails_with ".git/config is writable by group or others" check_private_tree "$DGL_WORK_DIR/src"
+}
+
+test_check_private_tree_has_no_private_group_exception_inside() {
+    lib
+    mkdir -p "$DGL_WORK_DIR/src/hooks"
+    chmod g+w "$DGL_WORK_DIR/src/hooks"
+    echo "me:x:$(id -g):" >"$FAKE/group"
+    assert_fails_with "hooks is writable by group or others" check_private_tree "$DGL_WORK_DIR/src"
+}
+
+test_check_private_tree_rejects_an_acl_deep_inside() {
+    lib
+    mkdir -p "$DGL_WORK_DIR/src/deep/er"
+    echo x >"$DGL_WORK_DIR/src/deep/er/build.ninja"
+    # Read-only, so the mode bits stay 644 and only the ACL scan can catch it.
+    setfacl -m u:nobody:r "$DGL_WORK_DIR/src/deep/er/build.ninja"
+    assert_fails_with "build.ninja under $DGL_WORK_DIR/src has an ACL" check_private_tree "$DGL_WORK_DIR/src"
+}
+
+test_git_safe_ignores_hooks_and_fsmonitor() {
+    lib
+    local clone=$TMP/r
+    git init -q "$clone"
+    printf '#!/bin/sh\ntouch %s/ran-hook\n' "$TMP" >"$clone/.git/hooks/post-checkout"
+    printf '#!/bin/sh\ntouch %s/ran-fsmonitor\n' "$TMP" >"$TMP/fsmon"
+    chmod +x "$clone/.git/hooks/post-checkout" "$TMP/fsmon"
+    git -C "$clone" config core.fsmonitor "$TMP/fsmon"
+    git -C "$clone" -c user.name=t -c user.email=t@t commit -q --allow-empty --no-verify -m one
+    rm -f "$TMP/ran-hook" "$TMP/ran-fsmonitor"
+    git_safe -C "$clone" -c advice.detachedHead=false checkout -q --detach HEAD
+    git_safe -C "$clone" status --porcelain >/dev/null
+    assert_no_file "$TMP/ran-hook"
+    assert_no_file "$TMP/ran-fsmonitor"
+}

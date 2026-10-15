@@ -77,3 +77,24 @@ test_fetch_refuses_a_work_dir_others_can_write_before_cloning() {
     assert_fails_with "writable by group or others" run_script fetch.sh
     assert_no_file "$DGL_WORK_DIR/src"
 }
+
+# The attack from review: a writable existing work/src with a planted hook.
+test_fetch_checks_an_existing_tree_before_running_git_in_it() {
+    make_fork
+    write_pin "$URL" "$FIRST"
+    run_script fetch.sh
+    printf '#!/bin/sh\ntouch %s/pwned\n' "$TMP" >"$DGL_WORK_DIR/src/.git/hooks/post-checkout"
+    chmod 777 "$DGL_WORK_DIR/src/.git/hooks/post-checkout"
+    assert_fails_with "writable by group or others" run_script fetch.sh
+    assert_no_file "$TMP/pwned"
+}
+
+test_fetch_never_runs_hooks_even_in_a_private_tree() {
+    make_fork
+    write_pin "$URL" "$FIRST"
+    run_script fetch.sh
+    printf '#!/bin/sh\ntouch %s/pwned\n' "$TMP" >"$DGL_WORK_DIR/src/.git/hooks/post-checkout"
+    chmod 755 "$DGL_WORK_DIR/src/.git/hooks/post-checkout"
+    run_script fetch.sh
+    assert_no_file "$TMP/pwned"
+}

@@ -107,6 +107,22 @@ verify_checkout() {
         die "$src has local changes; delete it and run scripts/fetch.sh again"
 }
 
+# True if $1 has an extended POSIX ACL (ls marks it with "+"). The mode bits
+# then do not say who can write (the group bits show the ACL mask), so such
+# paths are refused outright.
+has_extended_acl() {
+    # ls is the only always-installed tool that shows the ACL marker.
+    # shellcheck disable=SC2012
+    [ "$(ls -ld -- "$1" | cut -c11)" = + ]
+}
+
+# What to do when the build tree may have been writable by others. Fixing the
+# permissions is not enough: the files (and the BUILT_FROM stamp next to them)
+# may already have been replaced, so the tree has to be rebuilt.
+untrusted_tree_hint() {
+    echo "other users may have changed files under it. Fix the permissions (chmod go-w; setfacl -b for ACLs), then delete $DGL_WORK_DIR and run scripts/fetch.sh and scripts/build.sh again"
+}
+
 # Fail unless $1 and every directory above it (up to $ROOT) is owned by
 # $SECURE_UID and not writable by group or others. Used on everything root
 # installs into, so no other user can swap files under it.
@@ -119,6 +135,7 @@ check_secure_path() {
         mode=$(stat -c %a "$path")
         [ "$owner" = "$SECURE_UID" ] || die "$path is owned by uid $owner, expected $SECURE_UID"
         (( (8#$mode & 8#022) == 0 )) || die "$path is writable by group or others (mode $mode)"
+        ! has_extended_acl "$path" || die "$path has an ACL that may let other users write to it (remove it with: setfacl -b '$path')"
         [ "$path" = "$stop" ] && break
         [ "$path" = / ] && die "$1 is outside $ROOT"
         path=$(dirname "$path")
@@ -155,9 +172,10 @@ check_private_path() {
     while :; do
         owner=$(stat -c %u "$path")
         mode=$(stat -c %a "$path")
-        [ "$owner" = 0 ] || [ "$owner" = "$me" ] || die "$path is owned by uid $owner"
+        [ "$owner" = 0 ] || [ "$owner" = "$me" ] || die "$path is owned by uid $owner; $(untrusted_tree_hint)"
+        ! has_extended_acl "$path" || die "$path has an ACL; $(untrusted_tree_hint)"
         only_owner_can_write "$mode" "$owner" "$(stat -c %g "$path")" ||
-            die "$path is writable by group or others (mode $mode); fix with: chmod go-w '$path'"
+            die "$path is writable by group or others (mode $mode); $(untrusted_tree_hint)"
         [ "$path" = / ] && break
         path=$(dirname "$path")
     done
@@ -169,9 +187,10 @@ check_private_file() {
     file=$(readlink -f "$file")
     owner=$(stat -c %u "$file")
     mode=$(stat -c %a "$file")
-    [ "$owner" = 0 ] || [ "$owner" = "$(current_uid)" ] || die "$file is owned by uid $owner"
+    [ "$owner" = 0 ] || [ "$owner" = "$(current_uid)" ] || die "$file is owned by uid $owner; $(untrusted_tree_hint)"
+    ! has_extended_acl "$file" || die "$file has an ACL; $(untrusted_tree_hint)"
     only_owner_can_write "$mode" "$owner" "$(stat -c %g "$file")" ||
-        die "$file is writable by group or others (mode $mode); fix with: chmod go-w '$file'"
+        die "$file is writable by group or others (mode $mode); $(untrusted_tree_hint)"
     check_private_path "$(dirname "$file")"
 }
 

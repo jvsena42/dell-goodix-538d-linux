@@ -7,11 +7,11 @@ FROM ubuntu:26.04@sha256:f144425ff09be612d6d9ad965196e9cdc23dae1f42110a8a11a3e9a
 #   build:        meson ... libgirepository1.0-dev (libfprint's build needs
 #                 introspection; its test setup breaks without it)
 #   fork tests:   umockdev, gir1.2-umockdev-1.0, python3-gi, python3-cairo
-#   checks:       shellcheck, binutils (objdump)
+#   checks:       shellcheck, binutils (objdump), acl (setfacl, for tests)
 #   integration:  fprintd, dbus, python3-dbusmock, systemd
 RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-        ca-certificates git \
+        ca-certificates git acl \
         meson ninja-build pkgconf gcc g++ \
         libglib2.0-dev libgusb-dev libgudev-1.0-dev libpixman-1-dev libssl-dev libcairo2-dev \
         gobject-introspection libgirepository1.0-dev \

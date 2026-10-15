@@ -33,7 +33,11 @@ test_build_refuses_root() {
 
 test_build_allows_root_when_ci_says_so() {
     pinned_checkout
-    TEST_UID=0 ALLOW_ROOT_BUILD=1 run_script build.sh
+    local out
+    # The sandbox tree belongs to the real user, so a root build may still be
+    # refused by the ownership check; only the root guard itself must not fire.
+    out=$(TEST_UID=0 ALLOW_ROOT_BUILD=1 run_script build.sh 2>&1) || true
+    [[ $out != *"do not build as root"* ]] || fail "ALLOW_ROOT_BUILD=1 was ignored: $out"
 }
 
 test_build_refuses_an_unpinned_checkout() {
@@ -57,4 +61,19 @@ test_build_stamps_the_commit_and_library() {
 
 lib_sum_of() {
     sha256sum "$(readlink -f "$1/libfprint/libfprint-2.so.2")" | cut -d' ' -f1
+}
+
+test_build_refuses_a_build_dir_others_can_write() {
+    pinned_checkout
+    mkdir -p "$DGL_WORK_DIR/build"
+    chmod o+w "$DGL_WORK_DIR/build"
+    assert_fails_with "writable by group or others" run_script build.sh
+    assert_no_file "$FAKE/meson.log"
+}
+
+test_build_refuses_a_source_tree_with_an_acl() {
+    pinned_checkout
+    setfacl -m u:nobody:rwx "$DGL_WORK_DIR/src"
+    assert_fails_with "has an ACL" run_script build.sh
+    assert_no_file "$FAKE/meson.log"
 }

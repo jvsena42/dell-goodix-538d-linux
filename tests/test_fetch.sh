@@ -69,3 +69,11 @@ test_fetch_rejects_a_commit_with_submodules() {
     write_pin "$URL" "$(git -C "$TMP/fork" rev-parse HEAD)"
     assert_fails_with "submodules or meson subprojects" run_script fetch.sh
 }
+
+test_fetch_refuses_a_work_dir_others_can_write_before_cloning() {
+    make_fork
+    write_pin "$URL" "$FIRST"
+    chmod o+w "$DGL_WORK_DIR"
+    assert_fails_with "writable by group or others" run_script fetch.sh
+    assert_no_file "$DGL_WORK_DIR/src"
+}

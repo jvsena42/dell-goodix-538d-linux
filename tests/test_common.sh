@@ -179,3 +179,36 @@ test_check_private_path_rejects_a_group_that_is_someone_elses_primary_group() {
     echo "bob:x:4242:$(id -g)::/home/bob:/bin/bash" >"$FAKE/passwd"
     assert_fails_with "writable by group" check_private_path "$DGL_WORK_DIR/build"
 }
+
+# ACLs: the mode bits only show the ACL mask, so any extended ACL is refused.
+# Uses the real setfacl (the acl package; it is in ci/Dockerfile).
+test_check_private_path_rejects_an_acl() {
+    lib
+    mkdir -p "$DGL_WORK_DIR/build"
+    chmod 755 "$DGL_WORK_DIR/build"
+    setfacl -m u:nobody:rwx "$DGL_WORK_DIR/build"
+    echo "me:x:$(id -g):" >"$FAKE/group"
+    assert_fails_with "has an ACL" check_private_path "$DGL_WORK_DIR/build"
+}
+
+test_check_private_file_rejects_an_acl_on_the_library() {
+    lib
+    fake_build
+    setfacl -m u:nobody:rw "$DGL_WORK_DIR/build/libfprint/libfprint-2.so.2.0.0"
+    assert_fails_with "has an ACL" check_private_file "$DGL_WORK_DIR/build/libfprint/libfprint-2.so.2"
+}
+
+test_check_secure_path_rejects_an_acl() {
+    lib
+    mkdir -p "$ROOT/opt/a"
+    setfacl -m u:nobody:rx "$ROOT/opt/a"
+    assert_fails_with "setfacl -b" check_secure_path "$ROOT/opt/a"
+}
+
+test_untrusted_tree_errors_say_to_rebuild_not_just_chmod() {
+    lib
+    mkdir -p "$DGL_WORK_DIR/build"
+    chmod o+w "$DGL_WORK_DIR/build"
+    assert_fails_with "delete $DGL_WORK_DIR and run scripts/fetch.sh and scripts/build.sh again" \
+        check_private_path "$DGL_WORK_DIR/build"
+}

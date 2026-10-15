@@ -27,12 +27,15 @@ fi
 load_pin "$DGL_PIN_FILE"
 src=$DGL_WORK_DIR/src
 verify_checkout "$src" "$FORK_SHA"
+# The source and build trees must be ours alone, before and after building.
+check_private_path "$src"
 
 umask 022
 # Python helpers run during the build must not leave __pycache__ in the
 # pinned source tree, or the next verify_checkout would reject it.
 export PYTHONDONTWRITEBYTECODE=1
 mkdir -p "$build"
+check_private_path "$build"
 setup=(setup)
 [ -f "$build/build.ninja" ] && setup+=(--reconfigure)
 

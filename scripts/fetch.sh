@@ -9,6 +9,10 @@ source "$(dirname "$0")/../lib/common.sh"
 
 load_pin "$DGL_PIN_FILE"
 umask 022
+# Never populate a tree other users could write to: root later runs and
+# copies what is built here.
+mkdir -p "$DGL_WORK_DIR"
+check_private_path "$DGL_WORK_DIR"
 src=$DGL_WORK_DIR/src
 
 if [ -d "$src/.git" ]; then
@@ -20,7 +24,6 @@ if [ -d "$src/.git" ]; then
     fi
 else
     info "Cloning $FORK_URL"
-    mkdir -p "$DGL_WORK_DIR"
     "$GIT" clone --quiet --no-checkout "$FORK_URL" "$src"
 fi
 

@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Unit tests and shellcheck
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build the CI image
+        run: docker build -t dgl-ci ci/
+      - name: Unit tests
+        run: docker run --rm -v "$PWD:/repo" -w /repo dgl-ci tests/run.sh
+      - name: shellcheck
+        run: >
+          docker run --rm -v "$PWD:/repo" -w /repo dgl-ci
+          shellcheck -x -S style lib/common.sh scripts/*.sh tests/*.sh
+
+  build-and-integration:
+    name: Build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build the CI image
+        run: docker build -t dgl-ci ci/
+      - name: Fetch the pinned fork and build it
+        run: >
+          docker run --rm -e ALLOW_ROOT_BUILD=1 -v "$PWD:/repo" -w /repo dgl-ci
+          bash -c 'scripts/fetch.sh && scripts/build.sh'
+      - name: The fork's own test suite
+        # The "data" suite only checks that the fork regenerated its
+        # autosuspend hwdb file, which it has not. We do not install that
+        # file, so the failure does not affect us.
+        run: >
+          docker run --rm -e PYTHONDONTWRITEBYTECODE=1 -v "$PWD:/repo" -w /repo dgl-ci
+          meson test -C work/build --no-suite data --print-errorlogs

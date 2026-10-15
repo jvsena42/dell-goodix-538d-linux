@@ -16,6 +16,8 @@ repo=$PWD
 [ "${DGL_INTEGRATION:-}" = 1 ] || { echo "set DGL_INTEGRATION=1 to run" >&2; exit 2; }
 [ -f /.dockerenv ] || [ -n "${container:-}" ] || { echo "refusing to run outside a container: this does a real install" >&2; exit 2; }
 [ "$(id -u)" = 0 ] || { echo "run as root (inside the container)" >&2; exit 2; }
+# The container may have only just started: give systemd a moment.
+for _ in $(seq 30); do [ -d /run/systemd/system ] && break; sleep 1; done
 [ -d /run/systemd/system ] || { echo "systemd is not running as init" >&2; exit 2; }
 [ -f work/build/libfprint/libfprint-2.so.2 ] || { echo "run scripts/build.sh first" >&2; exit 2; }
 

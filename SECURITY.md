@@ -30,8 +30,9 @@ request that:
    explanation for every hit:
 
    ```bash
-   # networking, running programs, loading code
-   grep -rnE 'socket\(|connect\(|getaddrinfo|system\(|popen|exec[lv]p?e?\(|dlopen|g_module_open' libfprint/drivers/goodixtls libfprint/sigfm
+   # networking, running programs, loading code. At 037912c the only hit is
+   # the reviewed socketpair() in goodixtls.c that carries TLS in-process.
+   grep -rnE 'socket\(|socketpair|g_socket|connect\(|getaddrinfo|system\(|popen|exec[lv]p?e?\(|posix_spawn|fork\(|g_spawn|g_subprocess|dlopen|g_module_' libfprint/drivers/goodixtls libfprint/sigfm
    # writing to the sensor's key or firmware
    grep -rnE 'psk_write|write_firmware|update_firmware|flash' libfprint/drivers/goodixtls
    # files written and environment variables read
@@ -51,8 +52,10 @@ request that:
 - Before root runs or copies anything from the build directory, the scripts
   check that no other user can write to those files or the folders above them.
 - The installed files and the systemd drop-in are root-owned and not
-  group/world-writable. Their checksums, taken on the installed copies, are in
-  `/opt/dell-goodix-538d/MANIFEST`, and `scripts/verify.sh` checks them.
+  group/world-writable. The library's checksum, taken on the installed copy,
+  is in `/opt/dell-goodix-538d/MANIFEST`. `scripts/verify.sh` checks it, along
+  with every installed file's owner, mode and ACLs, and that nothing else is in
+  the install folder.
 - Variables that let the tests replace commands (`SUDO`, `SYSTEMCTL`, `GIT`,
   ...) are ignored unless `DGL_TEST=1`.
 - The build directory's path is compiled into the library, for libfprint's

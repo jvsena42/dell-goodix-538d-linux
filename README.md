@@ -62,7 +62,7 @@ Never pipe a script from the internet into a shell, this one included.
 | `build.sh` | you | builds into `work/build` and stamps the build with the commit and the library's checksum; meson may not download anything |
 | `probe.sh` | you; `sudo` for `systemctl` and one program | blocks and stops fprintd, opens the sensor once to read its firmware and key, then unblocks fprintd (it starts again on demand). Writes nothing to the sensor |
 | `install.sh` | you; `sudo` for copying, `systemctl` and replacing `/opt/dell-goodix-538d` | copies one library to `/opt/dell-goodix-538d`, adds a systemd drop-in so only fprintd loads it, restarts fprintd. If anything fails, even Ctrl-C, it rolls back |
-| `verify.sh` | you; `sudo` to start fprintd and read its memory map | checks the installed files against their checksums, the drop-in, fprintd's needed functions, and that fprintd uses the library |
+| `verify.sh` | you; `sudo` to start fprintd and read its memory map | checks the installed files' owner and permissions, the library's checksum, that nothing else is in the install folder, the drop-in, fprintd's needed functions, and that fprintd uses the library |
 | `uninstall.sh` | you; `sudo` | removes the drop-in, `/opt/dell-goodix-538d` and the sensor calibration file |
 
 The scripts refuse to let root run or copy anything from `work/` if another
@@ -74,7 +74,8 @@ others` or `has an ACL`, fixing the permissions is not enough: someone may
 already have replaced files. Fix the permissions, delete `work/`, and run
 `fetch.sh` and `build.sh` again. The check uses `getent`, so on machines with
 network accounts that are not enumerated, such as some LDAP setups, run
-`chmod go-w` on your clone before building.
+`chmod go-w` on your clone and on the folders above it (usually your home
+folder) before building.
 
 If the probe is killed hard (for example `kill -9`), fprintd stays blocked
 until the next reboot. Unblock it with `sudo systemctl unmask --runtime fprintd`.
@@ -95,11 +96,14 @@ lock screen, `sudo`, polkit prompts and `su`. We recommend fingerprint only for
 GNOME login and unlock:
 
 ```bash
-sudo pam-auth-update --remove fprintd
+sudo pam-auth-update --disable fprintd
 ```
 
 This removes fingerprint from `/etc/pam.d/common-auth` (`sudo`, polkit, `su`,
-text consoles). GNOME's login and lock screens keep working, because they use
+text consoles), and the choice survives package upgrades. Don't use
+`--remove` for this: it's meant for uninstalling a package. Ubuntu forgets
+the profile afterwards, so the next `libpam-fprintd` upgrade turns it back on
+for everything without asking. GNOME's login and lock screens keep working, because they use
 `/etc/pam.d/gdm-fingerprint`, which calls fprintd directly. Your password
 works everywhere as before.
 
@@ -166,8 +170,8 @@ plugins, which the fork doesn't load.
   anything from `work/`, the scripts check that no other user can write to
   those files or the folders above them. The probe result and the install are
   tied to the exact library `build.sh` produced, by its checksum. Installed
-  files are root-owned, and their checksums (taken on the installed copies)
-  go in `MANIFEST`.
+  files are root-owned, and the library's checksum (taken on the installed
+  copy) goes in `MANIFEST`.
 - **Limits of this sensor on Linux. Know them before using it for anything
   that matters:**
   - The TLS key between the laptop and the sensor is all zeros and public.
@@ -187,10 +191,14 @@ Report security problems as described in [SECURITY.md](SECURITY.md).
 | --- | --- | --- |
 | Unit tests (plain bash, fakes only, never touch the system) | CI and locally | `tests/run.sh` |
 | shellcheck | CI | see `.github/workflows/ci.yml` |
-| The fork's own test suite | CI | `meson test -C work/build --no-suite data` |
+| The fork's own test suite | CI | `PYTHONDONTWRITEBYTECODE=1 meson test -C work/build --no-suite data` |
 | Ubuntu's fprintd on our build, with libfprint's virtual sensor: enroll, verify match / no match, delete | CI (container) | `tests/integration/fprintd-virtual.sh` |
 | Real install, verify, rollback and uninstall under systemd, with D-Bus activation | CI (privileged container) | `tests/integration/systemd-install.sh` |
 | Real sensor, interactive | your laptop | `DGL_HARDWARE=1 tests/hardware.sh` |
+
+Keep `PYTHONDONTWRITEBYTECODE=1` when you run the fork's tests yourself.
+Otherwise its Python helpers leave `__pycache__` in `work/src`, and the next
+build refuses the modified checkout.
 
 The `data` suite is excluded because it only checks that the fork regenerated
 an autosuspend hwdb data file, which it has not, and we don't install that

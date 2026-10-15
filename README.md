@@ -68,7 +68,9 @@ Never pipe a script from the internet into a shell, this one included.
 The scripts refuse to let root run or copy anything from `work/` if another
 user could have changed it. If you see `writable by group or others`, run the
 `chmod go-w` command the error suggests. (Folders writable only by your own
-private group, which is Ubuntu's default for home folders, are fine.)
+private group, which is Ubuntu's default for home folders, are fine. The check
+uses `getent`, so on machines with network accounts that are not enumerated,
+such as some LDAP setups, run `chmod go-w` on your clone to be safe.)
 
 If the probe is killed hard (for example `kill -9`), fprintd stays blocked
 until the next reboot. Unblock it with `sudo systemctl unmask --runtime fprintd`.

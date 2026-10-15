@@ -335,3 +335,32 @@ build_stamp() {
 built_lib_sum() {
     sha256sum "$(readlink -f "$1/libfprint/libfprint-2.so.2")" | cut -d' ' -f1
 }
+
+# True if directory $1 is an install tree of ours: it has a MANIFEST, or it
+# holds nothing but what install.sh stages before writing one (PIN, and lib/
+# with the library and its symlink), as a killed install leaves behind.
+is_our_tree() {
+    local dir=$1 entry
+    [ -f "$dir/MANIFEST" ] && return 0
+    while IFS= read -r -d '' entry; do
+        case ${entry#"$dir"/} in
+            PIN | lib | lib/libfprint-2.so.2 | lib/libfprint-2.so.2.*) ;;
+            *) return 1 ;;
+        esac
+    done < <(find "$dir" -mindepth 1 -print0)
+}
+
+# Fail unless $1 (a file or symlink in an install tree) is owned by
+# $SECURE_UID, not group/world-writable (symlinks excepted: always 777), has
+# no ACL, and sits in a secure directory.
+check_secure_file() {
+    local file=$1 owner mode
+    owner=$(stat -c %u "$file")
+    [ "$owner" = "$SECURE_UID" ] || die "$file is owned by uid $owner, expected $SECURE_UID"
+    if [ ! -L "$file" ]; then
+        mode=$(stat -c %a "$file")
+        (( (8#$mode & 8#022) == 0 )) || die "$file is writable by group or others (mode $mode)"
+        ! has_extended_acl "$file" || die "$file has an ACL (remove it with: setfacl -b '$file')"
+    fi
+    check_secure_path "$(dirname "$file")"
+}

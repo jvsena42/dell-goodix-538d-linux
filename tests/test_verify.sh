@@ -42,7 +42,26 @@ test_verify_says_when_not_installed() {
 
 test_verify_detects_a_retargeted_symlink() {
     installed
-    cp "$ROOT/opt/dell-goodix-538d/lib/libfprint-2.so.2.0.0" "$ROOT/opt/dell-goodix-538d/lib/other.so"
-    ln -sfn other.so "$ROOT/opt/dell-goodix-538d/lib/libfprint-2.so.2"
+    ln -sfn ../PIN "$ROOT/opt/dell-goodix-538d/lib/libfprint-2.so.2"
     assert_fails_with "does not point at" run_script verify.sh
+}
+
+# Review repro: content matches, but the installed library is world-writable.
+test_verify_detects_a_writable_installed_library() {
+    installed
+    chmod 666 "$ROOT/opt/dell-goodix-538d/lib/libfprint-2.so.2.0.0"
+    assert_fails_with "writable by group or others" run_script verify.sh
+}
+
+test_verify_detects_a_writable_manifest() {
+    installed
+    chmod 666 "$ROOT/opt/dell-goodix-538d/MANIFEST"
+    assert_fails_with "writable by group or others" run_script verify.sh
+}
+
+# fprintd's LD_LIBRARY_PATH points here: any extra library would be loaded.
+test_verify_detects_an_extra_file_in_lib() {
+    installed
+    echo x >"$ROOT/opt/dell-goodix-538d/lib/libglib-2.0.so.0"
+    assert_fails_with "libglib-2.0.so.0" run_script verify.sh
 }

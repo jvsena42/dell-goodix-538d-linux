@@ -179,3 +179,19 @@ test_install_accepts_a_private_group_writable_home() {
     echo "me:x:$(id -g):" >"$FAKE/group"
     run_script install.sh
 }
+
+test_install_refuses_to_delete_a_foreign_old_dir() {
+    ready
+    mkdir -p "$ROOT/opt/dell-goodix-538d.old"
+    echo "my backup" >"$ROOT/opt/dell-goodix-538d.old/notes.txt"
+    assert_fails_with "not created by this project" run_script install.sh
+    assert_file "$ROOT/opt/dell-goodix-538d.old/notes.txt"
+}
+
+test_install_replaces_its_own_leftover_staging_dir() {
+    ready
+    mkdir -p "$ROOT/opt/dell-goodix-538d.new/lib"
+    cp "$TEST_PIN_FILE" "$ROOT/opt/dell-goodix-538d.new/PIN"
+    run_script install.sh
+    assert_no_file "$ROOT/opt/dell-goodix-538d.new"
+}

@@ -12,8 +12,18 @@ dropin=$(rootpath "$DGL_DROPIN")
 calib=$(rootpath "$DGL_CALIB")
 changed=
 
+# Check everything before changing anything, so a refusal never leaves a
+# half-removed install behind.
 if [ -f "$dropin" ]; then
     dropin_is_ours "$dropin" || die "$DGL_DROPIN was not written by this project; not touching it"
+fi
+for tree in "$prefix" "$prefix.new" "$prefix.old"; do
+    if [ -e "$tree" ]; then
+        is_our_tree "$tree" || die "$tree was not created by this project; not touching it"
+    fi
+done
+
+if [ -f "$dropin" ]; then
     info "Removing $DGL_DROPIN"
     as_root rm -f "$dropin"
     as_root rmdir "$(dirname "$dropin")" 2>/dev/null || true
@@ -23,16 +33,10 @@ if [ -f "$dropin" ]; then
     changed=1
 fi
 
-if [ -e "$prefix" ]; then
-    [ -f "$prefix/MANIFEST" ] || die "$DGL_PREFIX was not installed by this project; not touching it"
-    info "Removing $DGL_PREFIX"
-    as_root rm -rf "$prefix"
-    changed=1
-fi
-for leftover in "$prefix.new" "$prefix.old"; do
-    if [ -e "$leftover" ]; then
-        [ -f "$leftover/MANIFEST" ] || die "$leftover was not created by this project; not touching it"
-        as_root rm -rf "$leftover"
+for tree in "$prefix" "$prefix.new" "$prefix.old"; do
+    if [ -e "$tree" ]; then
+        info "Removing ${tree#"${ROOT%/}"}"
+        as_root rm -rf "$tree"
         changed=1
     fi
 done

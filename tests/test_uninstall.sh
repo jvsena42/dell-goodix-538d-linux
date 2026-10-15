@@ -58,7 +58,9 @@ test_uninstall_refuses_a_foreign_dropin() {
 
 test_uninstall_refuses_a_foreign_prefix() {
     mkdir -p "$ROOT/opt/dell-goodix-538d"
-    assert_fails_with "not installed by this project" run_script uninstall.sh
+    echo "someone else's" >"$ROOT/opt/dell-goodix-538d/notes.txt"
+    assert_fails_with "not created by this project" run_script uninstall.sh
+    assert_file "$ROOT/opt/dell-goodix-538d/notes.txt"
 }
 
 test_uninstall_removes_leftovers_from_an_interrupted_install() {
@@ -73,4 +75,27 @@ test_uninstall_reloads_systemd_before_removing_the_library() {
     : >"$FAKE/systemctl.log"
     run_script uninstall.sh
     assert_eq "$(head -n 1 "$FAKE/systemctl.log")" "daemon-reload"
+}
+
+# Review repro: install killed after staging lib/ and PIN, before MANIFEST.
+test_uninstall_cleans_up_a_staging_dir_from_a_killed_install() {
+    installed
+    local staging=$ROOT/opt/dell-goodix-538d.new
+    mkdir -p "$staging/lib"
+    cp "$ROOT/opt/dell-goodix-538d/lib/libfprint-2.so.2.0.0" "$staging/lib/"
+    ln -s libfprint-2.so.2.0.0 "$staging/lib/libfprint-2.so.2"
+    cp "$TEST_PIN_FILE" "$staging/PIN"
+    run_script uninstall.sh
+    assert_no_file "$staging"
+    assert_no_file "$ROOT/opt/dell-goodix-538d"
+    assert_contains "$FAKE/systemctl.log" "try-restart fprintd.service"
+}
+
+test_uninstall_refuses_a_foreign_leftover_before_changing_anything() {
+    installed
+    mkdir -p "$ROOT/opt/dell-goodix-538d.old"
+    echo "my backup" >"$ROOT/opt/dell-goodix-538d.old/notes.txt"
+    assert_fails_with "not created by this project" run_script uninstall.sh
+    assert_file "$ROOT/etc/systemd/system/fprintd.service.d/10-dell-goodix-538d.conf"
+    assert_file "$ROOT/opt/dell-goodix-538d/MANIFEST"
 }

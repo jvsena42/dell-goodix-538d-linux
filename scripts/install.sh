@@ -52,6 +52,13 @@ check_secure_path "$(dirname "$dropin_dir")"
 if [ -e "$prefix" ] && [ ! -f "$prefix/MANIFEST" ]; then
     die "$DGL_PREFIX exists but was not installed by this project; not touching it"
 fi
+# Leftovers from an interrupted install are replaced below; anything else
+# with those names is not ours to delete.
+for tree in "$staging" "$previous"; do
+    if [ -e "$tree" ]; then
+        is_our_tree "$tree" || die "$tree was not created by this project; not touching it"
+    fi
+done
 if [ -e "$dropin" ] && ! dropin_is_ours "$dropin"; then
     die "$DGL_DROPIN exists but was not written by this project; not touching it"
 fi

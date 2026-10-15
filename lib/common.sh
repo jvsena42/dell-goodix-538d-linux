@@ -201,13 +201,30 @@ check_private_file() {
 # build.ninja). The trees are created with umask 022, so the inside gets no
 # private-group exception.
 check_private_tree() {
-    local dir=$1 me bad
+    local dir=$1 me bad real link target
     me=$(current_uid)
     check_private_path "$dir"
-    bad=$(find "$dir" ! -type l \( \( ! -uid "$me" ! -uid 0 \) -o -perm /022 \) -print -quit)
+    real=$(cd "$dir" && pwd -P)
+    # Owner: every entry, symlinks included (a link owned by someone else is
+    # itself a sign of tampering). Write bits: everything but symlinks, whose
+    # mode is always 777.
+    bad=$(find "$dir" \( \( ! -uid "$me" ! -uid 0 \) -o \( ! -type l -perm /022 \) \) -print -quit)
     [ -z "$bad" ] || die "$bad is writable by group or others or owned by another user; $(untrusted_tree_hint)"
+    # Symlinks: git follows them for its config and hooks, so none at all in
+    # .git; elsewhere they must point inside the tree, which is checked above.
+    bad=$(find "$dir" \( -path '*/.git' -o -path '*/.git/*' \) -type l -print -quit)
+    [ -z "$bad" ] || die "$bad is a symlink inside .git; $(untrusted_tree_hint)"
+    while IFS= read -r -d '' link; do
+        target=$(readlink -f -- "$link") || die "$link is a broken symlink; $(untrusted_tree_hint)"
+        case $target in
+            "$real"/*) ;;
+            *) die "$link points outside $dir (to $target); $(untrusted_tree_hint)" ;;
+        esac
+    done < <(find "$dir" -type l -print0)
+    # ACLs: only listing lines (a type letter, nine permission characters and
+    # "+"); `ls -R` also prints "dir:" header lines, which may contain "+".
     # shellcheck disable=SC2012 # ls is the only always-installed tool that shows the ACL marker
-    bad=$(ls -lAR -- "$dir" | awk 'substr($1, 11, 1) == "+" { print $NF; exit }')
+    bad=$(ls -lAR -- "$dir" | awk '$1 ~ /^[-bcdlps][-r][-w][-xsS][-r][-w][-xsS][-r][-w][-xtT][+]$/ { print $NF; exit }')
     [ -z "$bad" ] || die "$bad under $dir has an ACL; $(untrusted_tree_hint)"
 }
 

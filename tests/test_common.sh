@@ -261,3 +261,43 @@ test_git_safe_ignores_hooks_and_fsmonitor() {
     assert_no_file "$TMP/ran-hook"
     assert_no_file "$TMP/ran-fsmonitor"
 }
+
+# Review repro: a symlink in the tree to a world-writable file outside it.
+test_check_private_tree_rejects_a_symlink_to_a_writable_file_outside() {
+    lib
+    mkdir -p "$DGL_WORK_DIR/src/.git" "$TMP/ext"
+    touch "$TMP/ext/config"
+    chmod 666 "$TMP/ext/config"
+    ln -s "$TMP/ext/config" "$DGL_WORK_DIR/src/.git/config"
+    assert_fails_with "symlink inside .git" check_private_tree "$DGL_WORK_DIR/src"
+}
+
+test_check_private_tree_rejects_any_symlink_in_git_even_inside_the_tree() {
+    lib
+    mkdir -p "$DGL_WORK_DIR/src/.git"
+    touch "$DGL_WORK_DIR/src/realconfig"
+    ln -s ../realconfig "$DGL_WORK_DIR/src/.git/config"
+    assert_fails_with "symlink inside .git" check_private_tree "$DGL_WORK_DIR/src"
+}
+
+test_check_private_tree_rejects_a_symlink_pointing_outside() {
+    lib
+    mkdir -p "$DGL_WORK_DIR/build/libfprint"
+    ln -s /etc/passwd "$DGL_WORK_DIR/build/libfprint/build.ninja"
+    assert_fails_with "points outside" check_private_tree "$DGL_WORK_DIR/build"
+}
+
+test_check_private_tree_accepts_symlinks_inside_the_tree() {
+    lib
+    fake_build
+    check_private_tree "$DGL_WORK_DIR/build"
+}
+
+# Review repro: "+" as 11th character of a directory header line.
+test_check_private_tree_ignores_plus_signs_in_paths() {
+    lib
+    local dir=$TMP/aaaaaaaaaa+/src
+    mkdir -p "$dir/sub" "$dir/bbbbbbbbbb+"
+    touch "$dir/sub/f"
+    check_private_tree "$dir"
+}

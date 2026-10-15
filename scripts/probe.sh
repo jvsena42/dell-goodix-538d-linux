@@ -29,7 +29,9 @@ lib_sum=$(built_lib_sum "$build")
     die "$build was not built from the pinned commit (or changed since); run scripts/build.sh"
 sensor_present || die "no Goodix $DGL_SENSOR_VID:$DGL_SENSOR_PID sensor found (check lsusb)"
 
-rm -f "$result"
+# Start clean: if an old log stayed and could not be overwritten, the probe
+# would not run and the old verdict would be stamped onto this build.
+rm -f "$result" "$log"
 
 restore_fprintd() {
     as_root "$SYSTEMCTL" unmask --runtime fprintd.service >/dev/null 2>&1 || true

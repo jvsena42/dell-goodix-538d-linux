@@ -95,3 +95,13 @@ test_classify_probe_log() {
     assert_eq "$(classify_probe_log "$f/probe-timeout.log")" unknown
     assert_eq "$(classify_probe_log /dev/null)" unknown
 }
+
+# Review repro: an old, unwritable probe.log must not decide this run.
+test_probe_never_reuses_an_old_log() {
+    fake_sensor
+    fake_example probe-bad-psk.log
+    cp "$REPO/tests/fixtures/probe-pass.log" "$DGL_WORK_DIR/probe.log"
+    chmod 444 "$DGL_WORK_DIR/probe.log"
+    assert_fails_with "Do not install" run_script probe.sh
+    assert_eq "$(cut -d' ' -f1 "$DGL_WORK_DIR/probe.result")" incompatible
+}

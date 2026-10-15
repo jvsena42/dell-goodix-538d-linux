@@ -1,0 +1,4 @@
+This program will report the prints saved in device
+(process:2211): libfprint-goodixtls53xd-DEBUG: 12:00:01.101: Device firmware: "GF5298_GM168SEC_APP_13025"
+
+** (manage-prints:2211): WARNING **: 12:00:01.110: Failed to open device: Invalid device firmware: "GF5298_GM168SEC_APP_13025"

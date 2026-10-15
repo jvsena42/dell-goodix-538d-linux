@@ -1,0 +1,4 @@
+# The exact libfprint fork commit this repo builds. Change it only in a
+# reviewed pull request that touches nothing else (see SECURITY.md).
+FORK_URL=https://github.com/lbssousa/libfprint.git
+FORK_SHA=037912c17992d2abc81c79c40e85b45ba1d3871e

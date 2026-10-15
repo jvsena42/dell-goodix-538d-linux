@@ -1,0 +1,6 @@
+This program will report the prints saved in device
+(process:2211): libfprint-goodixtls53xd-DEBUG: 12:00:01.101: Device firmware: "GF5298_GM168SEC_APP_13016"
+(process:2211): libfprint-goodixtls53xd-DEBUG: 12:00:01.140: Device PSK: 0x8e9b2a0c11f4d6a3d1c0e1f2a3b4c5d6e7f8091a2b3c4d5e6f708192a3b4c5d6
+(process:2211): libfprint-goodixtls53xd-DEBUG: 12:00:01.141: Device PSK flags: 0xbb020001
+
+** (manage-prints:2211): WARNING **: 12:00:01.150: Failed to open device: Invalid device PSK: 0x8e9b2a0c11f4d6a3d1c0e1f2a3b4c5d6e7f8091a2b3c4d5e6f708192a3b4c5d6

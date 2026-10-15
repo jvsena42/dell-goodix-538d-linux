@@ -1,0 +1,66 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    name: Unit tests and shellcheck
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build the CI image
+        run: docker build -t dgl-ci ci/
+      - name: Unit tests
+        run: docker run --rm -v "$PWD:/repo" -w /repo dgl-ci tests/run.sh
+      - name: shellcheck
+        run: >
+          docker run --rm -v "$PWD:/repo" -w /repo dgl-ci
+          shellcheck -x -S style lib/common.sh scripts/*.sh tests/*.sh tests/integration/*.sh
+
+  build-and-integration:
+    name: Build and integration tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build the CI image
+        run: docker build -t dgl-ci ci/
+      - name: Fetch the pinned fork and build it
+        # As the runner's user, like everyone else builds: the scripts refuse
+        # to build in a tree owned by someone else.
+        run: >
+          docker run --rm -u "$(id -u):$(id -g)" -e HOME=/tmp -v "$PWD:/repo" -w /repo dgl-ci
+          bash -c 'scripts/fetch.sh && scripts/build.sh && scripts/build.sh --test-build'
+      - name: The fork's own test suite
+        # The "data" suite only checks that the fork regenerated its
+        # autosuspend hwdb file, which it has not. We do not install that
+        # file, so the failure does not affect us.
+        run: >
+          docker run --rm -e PYTHONDONTWRITEBYTECODE=1 -v "$PWD:/repo" -w /repo dgl-ci
+          meson test -C work/build --no-suite data --print-errorlogs
+      - name: "Integration: fprintd + virtual sensor"
+        run: >
+          docker run --rm -e DGL_INTEGRATION=1 -v "$PWD:/repo" -w /repo dgl-ci
+          tests/integration/fprintd-virtual.sh
+      - name: "Integration: install, verify, uninstall under systemd"
+        run: |
+          cid=$(docker run -d --privileged --cgroupns=host \
+            -v /sys/fs/cgroup:/sys/fs/cgroup:rw --tmpfs /run --tmpfs /run/lock \
+            -v "$PWD:/repo:ro" dgl-ci /sbin/init)
+          trap 'docker rm -f "$cid" >/dev/null' EXIT
+          docker exec -e DGL_INTEGRATION=1 -w /repo "$cid" tests/integration/systemd-install.sh

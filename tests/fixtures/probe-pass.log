@@ -1,0 +1,8 @@
+This program will report the prints saved in device
+(process:2211): libfprint-goodixtls53xd-DEBUG: 12:00:01.101: Device firmware: "GF5298_GM168SEC_APP_13016"
+(process:2211): libfprint-goodixtls53xd-DEBUG: 12:00:01.140: Device PSK: 0x66687aadf862bd776c8fc18b8e9f8e20089714856ee233b3902a591d0d5f2925
+(process:2211): libfprint-goodixtls53xd-DEBUG: 12:00:01.141: Device PSK flags: 0xbb020001
+(process:2211): libfprint-goodixtls53xd-DEBUG: 12:00:01.190: Device reset number: 2048
+(process:2211): libfprint-goodixtls-DEBUG: 12:00:01.733: TLS connection ready
+
+** (manage-prints:2211): WARNING **: 12:00:01.801: Device Goodix 53xd doesn't support storage

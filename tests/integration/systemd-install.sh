@@ -35,12 +35,17 @@ ok() { echo "ok    $*"; }
 
 # Start fprintd through D-Bus activation (the way PAM and GNOME reach it)
 # and print which libfprint it mapped.
+# Retries for a while: right after boot the system bus may not be up yet.
 fprintd_lib() {
-    timeout 10 gdbus call --system --dest net.reactivated.Fprint \
-        --object-path /net/reactivated/Fprint/Manager \
-        --method net.reactivated.Fprint.Manager.GetDevices >/dev/null 2>&1 || true
-    local pid
-    pid=$(systemctl show -p MainPID --value fprintd.service)
+    local pid=0 _
+    for _ in $(seq 20); do
+        timeout 10 gdbus call --system --dest net.reactivated.Fprint \
+            --object-path /net/reactivated/Fprint/Manager \
+            --method net.reactivated.Fprint.Manager.GetDevices >/dev/null 2>&1 || true
+        pid=$(systemctl show -p MainPID --value fprintd.service)
+        [ "$pid" = 0 ] || break
+        sleep 1
+    done
     [ "$pid" != 0 ] || { echo none; return; }
     grep -o '/[^ ]*libfprint-2\.so[^ ]*' "/proc/$pid/maps" | head -n 1
 }

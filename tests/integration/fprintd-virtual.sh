@@ -111,17 +111,22 @@ grep -q "enroll-completed" "$tmp/enroll.out" || { cat "$tmp/enroll.out"; fail "e
 echo "ok    fprintd-enroll completes"
 
 # 5. Verify with the right finger, then with another one.
+# Scan only once fprintd-verify reports it has started: the sensor socket from
+# enrollment is left behind when the device closes, so its existence proves
+# nothing, and a scan sent too early fails. stdbuf keeps the output unbuffered.
 verify() {
-    timeout 60 fprintd-verify root >"$tmp/verify.out" 2>&1 &
+    : >"$tmp/verify.out"
+    timeout 60 stdbuf -oL fprintd-verify root >"$tmp/verify.out" 2>&1 &
     local v=$!
-    sleep 1
-    sensor SCAN "$1"
+    wait_for "fprintd-verify to start" grep -q "Verify started" "$tmp/verify.out"
+    sensor SCAN "$1" || fail "could not send a scan to the virtual sensor"
     wait "$v" || true
-    cat "$tmp/verify.out"
 }
-verify finger-a | grep -q "verify-match" || fail "the enrolled finger was not accepted"
+verify finger-a
+grep -q "verify-match" "$tmp/verify.out" || { cat "$tmp/verify.out"; fail "the enrolled finger was not accepted"; }
 echo "ok    fprintd-verify accepts the enrolled finger"
-verify finger-b | grep -q "verify-no-match" || fail "another finger was not rejected"
+verify finger-b
+grep -q "verify-no-match" "$tmp/verify.out" || { cat "$tmp/verify.out"; fail "another finger was not rejected"; }
 echo "ok    fprintd-verify rejects another finger"
 
 # 6. Delete.

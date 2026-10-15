@@ -1,0 +1,1 @@
+# dell-goodix-538d-linux

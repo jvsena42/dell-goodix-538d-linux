@@ -169,3 +169,13 @@ test_check_symbols_fails_when_fprintd_imports_nothing() {
     assert_fails_with "imports no libfprint functions" \
         check_symbols "$DGL_WORK_DIR/build/libfprint/libfprint-2.so.2.0.0" "$ROOT/usr/libexec/fprintd"
 }
+
+test_check_private_path_rejects_a_group_that_is_someone_elses_primary_group() {
+    lib
+    mkdir -p "$DGL_WORK_DIR/build"
+    chmod g+w "$DGL_WORK_DIR/build"
+    echo "me:x:$(id -g):" >"$FAKE/group"
+    # useradd -g me bob: bob is not listed in the group, but can write.
+    echo "bob:x:4242:$(id -g)::/home/bob:/bin/bash" >"$FAKE/passwd"
+    assert_fails_with "writable by group" check_private_path "$DGL_WORK_DIR/build"
+}

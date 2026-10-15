@@ -100,7 +100,15 @@ FAKE
 #!/usr/bin/env bash
 case $1 in
     group) if [ -f "$FAKE/group" ]; then cat "$FAKE/group"; else echo "staff:x:$2:alice"; fi ;;
-    passwd) echo "me:x:$2:$2::/home/me:/bin/bash" ;;
+    passwd)
+        if [ -n "${2:-}" ]; then
+            echo "me:x:$2:$(id -g)::/home/me:/bin/bash"
+        else
+            # Enumeration: just us, unless the test added users to $FAKE/passwd.
+            echo "me:x:$(id -u):$(id -g)::/home/me:/bin/bash"
+            cat "$FAKE/passwd" 2>/dev/null || true
+        fi
+        ;;
 esac
 FAKE
 

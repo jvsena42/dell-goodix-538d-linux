@@ -127,7 +127,10 @@ check_secure_path() {
 
 # True if mode $1 on something owned by uid $2 with gid $3 lets nobody but
 # the owner (or root) write to it. Group write is fine when the group is the
-# owner's private group with no other members (Ubuntu's default for homes).
+# owner's private group with no other members (Ubuntu's default for homes):
+# same name as the owner, no listed members, and no other user who has it as
+# their primary group (group entries never list those). Users that NSS does
+# not enumerate (some LDAP setups) cannot be seen; see README.
 # A root-owned sticky directory such as /tmp is fine too: other users cannot
 # rename or delete what we own inside it.
 only_owner_can_write() {
@@ -136,8 +139,10 @@ only_owner_can_write() {
     (( (8#$mode & 8#002) == 0 )) || return 1
     (( (8#$mode & 8#020) == 0 )) && return 0
     entry=$("$GETENT" group "$gid") || return 1
-    # name:x:gid:members. Private group: same name as the owner, no members.
-    [ "${entry%%:*}" = "$("$GETENT" passwd "$owner" | cut -d: -f1)" ] && [ -z "${entry##*:}" ]
+    # name:x:gid:members
+    [ "${entry%%:*}" = "$("$GETENT" passwd "$owner" | cut -d: -f1)" ] || return 1
+    [ -z "${entry##*:}" ] || return 1
+    [ -z "$("$GETENT" passwd | awk -F: -v g="$gid" -v o="$owner" '$4 == g && $3 != o')" ]
 }
 
 # Fail if $1 or any directory above it is writable by group or others, or is

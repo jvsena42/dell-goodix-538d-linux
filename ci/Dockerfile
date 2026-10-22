@@ -1,7 +1,7 @@
 # The one image every CI job runs in. The base image is pinned by digest
 # (packages come from the archive at build time). Dependabot proposes digest
 # updates as pull requests.
-FROM ubuntu:26.04@sha256:f144425ff09be612d6d9ad965196e9cdc23dae1f42110a8a11a3e9a8198759f7
+FROM ubuntu:26.04@sha256:c098726dd9b9733f3e885f8de0ef375206a311b0a317eadc40d347b1115fb944
 
 # Everything comes from the Ubuntu archive.
 #   build:        meson ... libgirepository1.0-dev (libfprint's build needs
